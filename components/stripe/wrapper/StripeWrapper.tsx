@@ -30,8 +30,10 @@ export default function StripeWrapper(_: IStripeWrapper) {
     const cardElement = elements!.getElement(CardElement);
     if (!cardElement) return setIsSubmitting(false);
 
+    // @ts-ignore
     const cardString = cardElement._parent.className;
     if (
+      // @ts-ignore
       (cardElement._parent.className && cardString.includes('StripeElement--invalid')) ||
       cardString.includes('StripeElement--empty')
     ) {
