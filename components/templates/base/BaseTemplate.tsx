@@ -1,4 +1,4 @@
-export interface IBaseTemplate {
+export type IBaseTemplate = {
   sampleTextProp: string;
 }
 

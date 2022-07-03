@@ -1,7 +1,11 @@
 // @ts-check
+import { Elements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 import { RouterContext } from 'next/dist/shared/lib/router-context';
 import * as NextImage from 'next/image';
 import '../styles/globals.css';
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PK ?? '');
 
 const BREAKPOINTS_INT = {
   xs: 330,
@@ -49,3 +53,11 @@ export const parameters = {
     Provider: RouterContext.Provider,
   },
 };
+
+export const decorators = [
+  (Story) => (
+    <Elements stripe={stripePromise}>
+      <Story />
+    </Elements>
+  ),
+];
