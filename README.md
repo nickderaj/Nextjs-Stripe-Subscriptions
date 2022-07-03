@@ -6,7 +6,9 @@
 
 ## Introduction
 
-This is a Next.js starter template with TypeScript to easily get started on a production ready app. Included are
+This repo was used to test a subscription object on Stripe with a recurring payment & usage records. The majority of the methods are under `components/stripe/StripeWrapper.tsx`
+
+This is a built on top of the [Next.js starter template](https://github.com/nickderaj/Nextjs-TS-Template) repo with TypeScript to easily get started on a production ready app. Included are
 
 - Stories: for designing components and seeing them live,
 - Tailwind CSS: for quick development without the need of CSS classes,
