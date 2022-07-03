@@ -6,6 +6,8 @@ export type IStripeWrapper = {};
 
 export default function StripeWrapper(_: IStripeWrapper) {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [subscriptionItemId, setSubscriptionItemId] = useState<string>('');
+  const [updateMessage, setUpdateMessage] = useState<string>('');
   const [plan, setPlan] = useState<string>('basic');
 
   const billingDetails = {
@@ -28,6 +30,14 @@ export default function StripeWrapper(_: IStripeWrapper) {
     const cardElement = elements!.getElement(CardElement);
     if (!cardElement) return setIsSubmitting(false);
 
+    const cardString = cardElement._parent.className;
+    if (
+      (cardElement._parent.className && cardString.includes('StripeElement--invalid')) ||
+      cardString.includes('StripeElement--empty')
+    ) {
+      setUpdateMessage('Invalid Card');
+      return setIsSubmitting(false);
+    }
     try {
       setIsSubmitting(true);
 
@@ -36,7 +46,12 @@ export default function StripeWrapper(_: IStripeWrapper) {
       const customerReq = await fetch('/api/customer');
       const customer = await customerReq.json();
       console.log('customer: ', customer);
-      if (customer.error) return setIsSubmitting(false);
+      setUpdateMessage('Created customer');
+      if (customer.error) {
+        console.log('error: ', customer.error);
+        setUpdateMessage(customer.error.message ?? '');
+        return setIsSubmitting(false);
+      }
 
       // 2) Subscribe to service
       console.log('subscribing to service...');
@@ -52,18 +67,31 @@ export default function StripeWrapper(_: IStripeWrapper) {
       });
       const subscription = await subscriptionReq.json();
       console.log('subscription: ', subscription);
-      if (subscription.error) return setIsSubmitting(false);
+      setUpdateMessage('Created subscription');
+      if (subscription.error) {
+        console.log('error: ', subscription.error);
+        setUpdateMessage(subscription.error.message ?? '');
+        return setIsSubmitting(false);
+      }
 
       // 3) Pay original bill
       console.log('paying the original invoice...');
-      const cardPaymentReq = await stripe!.confirmCardPayment(subscription.data.latest_invoice.payment_intent.client_secret, {
+      const cardPayment = await stripe!.confirmCardPayment(subscription.data.latest_invoice.payment_intent.client_secret, {
         payment_method: {
           card: cardElement,
           billing_details: billingDetails,
         },
       });
-      if (cardPaymentReq.error) setIsSubmitting(false);
-      console.log('invoice paid: ', cardPaymentReq);
+      if (cardPayment.error) {
+        console.log('error: ', cardPayment.error);
+        setUpdateMessage(cardPayment.error.message ?? '');
+        return setIsSubmitting(false);
+      }
+      setUpdateMessage('Paid subscription');
+      console.log('invoice paid: ', cardPayment);
+
+      // 4) Set the Id for adding usage records
+      setSubscriptionItemId(subscription.data.items.data[1].id);
 
       setIsSubmitting(false);
     } catch (error) {
@@ -72,37 +100,66 @@ export default function StripeWrapper(_: IStripeWrapper) {
     }
   };
 
+  const handleBookSession = async () => {
+    if (!stripe) return;
+    setIsSubmitting(true);
+
+    const usageRecordReq = await fetch('/api/usage_record', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        subscriptionItem: subscriptionItemId,
+      }),
+    });
+    const usageRecord = await usageRecordReq.json();
+
+    setUpdateMessage('Booked session');
+    console.log(usageRecord);
+    setIsSubmitting(false);
+  };
+
   return (
-    <form className="flex flex-col justify-center items-center w-96 mx-auto h-screen text-center" onSubmit={handleSubmit}>
-      <h1 className="text-xl pb-6">Subscribe</h1>
-      <div className="flex">
-        <SubscriptionCard title="Basic" flatPrice={10} sessionPrice={50} active={plan === 'basic'} setActive={setPlan} />
-        <SubscriptionCard title="Premium" flatPrice={25} sessionPrice={50} active={plan === 'premium'} setActive={setPlan} />
-      </div>
-      <div className="w-full bg-pink-100 p-2 mt-6 rounded-xl">
-        <CardElement
-          options={{
-            hidePostalCode: true,
-            style: {
-              base: {
-                color: 'black',
-                '::placeholder': {
+    <div className="flex flex-col justify-center items-center w-96 mx-auto h-screen text-center">
+      <form className="flex flex-col justify-center items-center w-full mx-auto text-center" onSubmit={handleSubmit}>
+        <h1 className="text-xl pb-6">Subscribe</h1>
+        <div className="flex">
+          <SubscriptionCard title="Basic" flatPrice={10} sessionPrice={50} active={plan === 'basic'} setActive={setPlan} />
+          <SubscriptionCard title="Premium" flatPrice={25} sessionPrice={50} active={plan === 'premium'} setActive={setPlan} />
+        </div>
+        <div className="w-full bg-pink-100 p-2 mt-6 rounded-xl">
+          <CardElement
+            options={{
+              hidePostalCode: true,
+              style: {
+                base: {
                   color: 'black',
+                  '::placeholder': {
+                    color: 'black',
+                  },
+                },
+                invalid: {
+                  color: 'red',
                 },
               },
-              invalid: {
-                color: 'red',
-              },
-            },
-          }}
-        />
-      </div>
+            }}
+          />
+        </div>
+        <button
+          className="py-2 px-6 mt-4 bg-purple-100 rounded-xl disabled:bg-neutral-100 disabled:cursor-not-allowed"
+          disabled={isSubmitting}
+          type="submit">
+          Sign Up
+        </button>
+      </form>
       <button
-        className="py-2 px-6 mt-4 bg-purple-100 rounded-xl disabled:bg-neutral-50 disabled:cursor-not-allowed"
-        disabled={isSubmitting}
-        type="submit">
-        Sign Up
+        className="py-2 px-6 mt-4 bg-purple-100 rounded-xl disabled:bg-neutral-100 disabled:cursor-not-allowed"
+        disabled={isSubmitting || !subscriptionItemId}
+        onClick={handleBookSession}>
+        Add Session
       </button>
-    </form>
+      <span className="mt-2">{updateMessage}</span>
+    </div>
   );
 }
