@@ -10,6 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
     const customer = await stripe!.customers.search({
       query: `email: '${email}'`,
+      expand: ['data.subscriptions'],
     });
     if (customer.data.length === 0) res.status(200).json({ error: 'Nothing found.' });
 
